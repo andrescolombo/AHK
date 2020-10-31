@@ -1,0 +1,210 @@
+#SingleInstance force
+
+; Extraction Script done by Andy (Osboxs)
+
+1::
+global color
+global distance
+global tolerance
+global sleeping
+global hp_color
+global exp_icon_color
+global inv_color
+global map_cross
+;~ PixelGetColor, hp_color, 1890, 1070, Alt RGB ; Health Color
+hp_color := 0x03617B
+tolerance := 80
+exp_icon_color := 0xB9A02D
+inv_color := 0x80E7FF
+map_cross := 0x009CCB
+
+;Compare color function
+CompareColor(x,y,z) ; x Pos, Y Pos, Compare with color Z
+{
+PixelGetColor, color, %x%, %y%, Alt RGB
+
+;split target color into rgb
+tr := format("{:d}","0x" . substr(z,3,2))
+tg := format("{:d}","0x" . substr(z,5,2))
+tb := format("{:d}","0x" . substr(z,7,2))
+
+;split pixel into rgb
+pr := format("{:d}","0x" . substr(color,3,2))
+pg := format("{:d}","0x" . substr(color,5,2))
+pb := format("{:d}","0x" . substr(color,7,2))
+
+;check distance
+distance := sqrt((tr-pr)**2+(tg-pg)**2+(pb-tb)**2)
+}
+
+loop
+{
+ToolTip, Macro running..., 50, 50
+
+CheckHealth:
+CompareColor(1890,1064,hp_color)
+if(distance<tolerance) ;  If HP > 25% wake up and continue
+	{
+		;Ok, HP > 25% , check Again
+		ToolTip HP > 25`%, 50, 50
+		Sleep, 250
+		CompareColor(1890,1064,hp_color)
+		if(distance<tolerance) ;  If HP > 25% wake up and continue
+			{
+				ToolTip Confirmed HP > 25`%, 50, 50
+				Sleep, 250
+				CheckSleeping:
+					CompareColor(1594,999,exp_icon_color)
+					if(distance<tolerance) ;  Check if Exp Icon Present
+						{
+							ToolTip, Wake up Neo..., 50, 50
+							Send, e
+							Sleep, 1500
+						}
+					CompareColor(1474,999,exp_icon_color)
+					if(distance<tolerance) ;  2nd Check if Exp Icon Present
+						{
+							ToolTip, Wake up Neo..., 50, 50
+							Send, e
+							Sleep, 1500
+						}
+					else
+						{
+						Goto, ExtractSection
+						}
+			}			
+	}
+else ; If HP < 25% go to Recover
+	{
+		Goto, Recover
+	}
+
+ExtractSection:
+
+CheckIfMapOpen:
+CompareColor(1250,94,map_cross) ; Check if Map is open
+if(map_open > 1)
+	{
+	Goto, Recover
+	}
+	
+if(InventoryClose > 1)
+	{
+	Goto, GoToSleep
+	}
+
+if(distance<tolerance)
+	{
+	ToolTip, Map Open`, close it
+	Send, {Esc}
+	Sleep, 1000
+	map_open++
+	Goto, CheckInventory
+	}
+
+CheckInventory:
+ToolTip, Checking inventory, 50, 50
+Sleep 1000
+distance := 1000 ; Clear distance variable
+CompareColor(1164,132,inv_color) ; Check ife Inventory is open
+if(distance<tolerance)		
+	{
+		ToolTip, Inventory Open`, extracting, 50, 50
+		Goto, Extract
+	}
+else
+	{
+		ToolTip, Inventory Closed`, opening, 50, 50
+		Send, f
+		Sleep, 1000
+		InventoryClose++
+		Goto, ExtractSection
+	}
+	
+Extract:
+ToolTip, Extracting, 50, 50
+MouseMove, 256, 274
+sleep, 200
+Send, e
+Sleep, 200
+MouseMove 353, 180
+Click
+sleep 3500
+goto, CheckHealth
+
+; Start recovering
+Recover:
+
+; Close inventory
+CompareColor(1164,132,inv_color) ; Check ife Inventory is open
+if(distance<tolerance)
+	{
+		ToolTip, Inventory Open`, closing for heal, 50, 50
+		Send, {Esc}
+		Sleep, 1000
+	}
+
+GoToSleep:
+ToolTip, Laying in Tek Pod, 50, 50
+Send, {DOWN Down}
+sleep 2000
+Send, {DOWN Up}
+sleep 100
+Send, {e Down}
+sleep 1000
+MouseMove, 1256, 449
+sleep 1000
+Send, {e up}
+
+;CheckSleeping
+Sleep, 1000
+ToolTip, Waiting to check if laying on Tek Pod, 50, 50
+CompareColor(1714,999,exp_icon_color)
+if(distance>tolerance) ;  Exp icon not present
+	{
+	CompareColor(1594,999,exp_icon_color)
+	if(distance>tolerance) ;  Exp icon not present
+		{
+			CompareColor(1474,999,exp_icon_color)
+			ToolTip, Checking second exp icon
+			if(distance>tolerance) ;  Second exp icon not present
+				{
+					ToolTip, No exp icon found, going to sleep again
+					Sleep, 1000
+					Goto, GoToSleep
+				}
+		}
+	}
+	else
+	{
+	ToolTip, Sleeping and recovering in Tek Pod, 50, 50
+	}
+
+;Heal until full
+KeepHealing:
+Loop
+	{
+	Sleep, 1000
+	; Check if HP 100%
+	CompareColor(1890,1023,hp_color)
+	if(distance<tolerance)
+		{
+			ToolTip HP > 100`% %distance%, 50, 50
+			goto, Healed
+		}
+	else
+		{
+			Goto, KeepHealing
+			
+		}
+	}
+Healed:
+Send, e
+Sleep 1000
+map_open := 0
+InventoryClose := 0
+}
+
+2::Pause
+3::Reload
++Esc::ExitApp
